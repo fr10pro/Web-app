@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram User Info</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-widget.js?22" 
+            data-telegram-login="your_bot_username" 
+            data-size="large" 
+            data-auth-url="https://your-app-url.com/auth" 
+            data-request-access="write"></script>
+    <style>
+        .loader {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #3498db;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .premium-badge {
+            background: linear-gradient(135deg, #ffd700, #c5a600);
+            color: #000;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="bg-blue-600 p-4 text-white text-center">
+                <h1 class="text-2xl font-bold">Telegram User Info</h1>
+                <p class="text-blue-100">Authenticate to view your profile details</p>
+            </div>
+            
+            <div id="auth-container" class="p-6 flex justify-center">
+                <!-- Telegram Login Widget will appear here -->
+            </div>
+            
+            <div id="loading-container" class="hidden p-6">
+                <div class="loader"></div>
+                <p class="text-center text-gray-600 mt-2">Verifying your details...</p>
+            </div>
+            
+            <div id="profile-container" class="hidden p-6">
+                <div class="flex flex-col items-center mb-6">
+                    <img id="user-photo" src="" alt="Profile Photo" class="w-24 h-24 rounded-full mb-4 border-4 border-blue-500">
+                    <h2 id="user-name" class="text-xl font-bold text-gray-800"></h2>
+                    <div id="premium-badge" class="hidden premium-badge px-3 py-1 rounded-full text-sm font-semibold mt-2">
+                        Telegram Premium
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">User ID:</span>
+                        <span id="user-id" class="text-gray-800 font-mono"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">Username:</span>
+                        <span id="username" class="text-gray-800"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">First Name:</span>
+                        <span id="first-name" class="text-gray-800"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">Last Name:</span>
+                        <span id="last-name" class="text-gray-800"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">Language Code:</span>
+                        <span id="language-code" class="text-gray-800"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">Auth Date:</span>
+                        <span id="auth-date" class="text-gray-800"></span>
+                    </div>
+                    <div class="flex justify-between border-b pb-2">
+                        <span class="text-gray-600 font-medium">Premium Status:</span>
+                        <span id="premium-status" class="text-gray-800"></span>
+                    </div>
+                </div>
+                
+                <button id="logout-btn" class="w-full mt-6 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                    Log Out
+                </button>
+            </div>
+            
+            <div id="error-container" class="hidden p-6">
+                <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                    <p id="error-message" class="font-medium"></p>
+                </div>
+                <button onclick="location.reload()" class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition duration-200">
+                    Try Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const authContainer = document.getElementById('auth-container');
+            const loadingContainer = document.getElementById('loading-container');
+            const profileContainer = document.getElementById('profile-container');
+            const errorContainer = document.getElementById('error-container');
+            const logoutBtn = document.getElementById('logout-btn');
+            
+            // Check if we have user data in URL hash
+            const hash = window.location.hash.substring(1);
+            if (hash) {
+                try {
+                    const userData = JSON.parse(decodeURIComponent(hash));
+                    showUserProfile(userData);
+                } catch (e) {
+                    showError("Invalid user data received");
+                }
+            }
+            
+            logoutBtn.addEventListener('click', function() {
+                // Clear the hash and reload
+                window.location.hash = '';
+                window.location.reload();
+            });
+            
+            function showLoading() {
+                authContainer.classList.add('hidden');
+                profileContainer.classList.add('hidden');
+                errorContainer.classList.add('hidden');
+                loadingContainer.classList.remove('hidden');
+            }
+            
+            function showUserProfile(user) {
+                loadingContainer.classList.add('hidden');
+                authContainer.classList.add('hidden');
+                errorContainer.classList.add('hidden');
+                
+                // Set user data
+                document.getElementById('user-id').textContent = user.id || 'N/A';
+                document.getElementById('username').textContent = user.username ? `@${user.username}` : 'Not set';
+                document.getElementById('first-name').textContent = user.first_name || 'N/A';
+                document.getElementById('last-name').textContent = user.last_name || 'N/A';
+                document.getElementById('language-code').textContent = user.language_code || 'N/A';
+                document.getElementById('auth-date').textContent = user.auth_date ? new Date(user.auth_date * 1000).toLocaleString() : 'N/A';
+                document.getElementById('premium-status').textContent = user.is_premium ? 'Yes' : 'No';
+                
+                // Display name
+                const name = [user.first_name, user.last_name].filter(Boolean).join(' ');
+                document.getElementById('user-name').textContent = name;
+                
+                // Display photo if available
+                if (user.photo_url) {
+                    document.getElementById('user-photo').src = user.photo_url;
+                } else {
+                    document.getElementById('user-photo').src = 'https://via.placeholder.com/150?text=No+Photo';
+                }
+                
+                // Show premium badge if user is premium
+                if (user.is_premium) {
+                    document.getElementById('premium-badge').classList.remove('hidden');
+                }
+                
+                profileContainer.classList.remove('hidden');
+            }
+            
+            function showError(message) {
+                loadingContainer.classList.add('hidden');
+                authContainer.classList.add('hidden');
+                profileContainer.classList.add('hidden');
+                
+                document.getElementById('error-message').textContent = message;
+                errorContainer.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
