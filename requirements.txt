@@ -1,6 +1,6 @@
-flask
-pyrogram
+pyrogram==2.0.106
 tgcrypto
-yt-dlp
-moviepy
+flask
 requests
+aiohttp
+certifi
