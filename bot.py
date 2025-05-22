@@ -7,7 +7,6 @@ from flask import Flask, request, render_template_string, redirect
 from pyrogram import Client, filters, enums
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
 from yt_dlp import YoutubeDL
-from moviepy.editor import VideoFileClip
 
 API_ID = 28593211  # your api_id
 API_HASH = "27ad7de4fe5cab9f8e310c5cc4b8d43d"
@@ -74,7 +73,6 @@ async def handle_download(_, msg):
         filepath, thumb_url = download_media(url)
         fname = os.path.basename(filepath)
 
-        # Rename Option (Skip for now, or use callback buttons)
         caption = f"{fname}\n\nMade by @fr10pro"
 
         thumb = None
