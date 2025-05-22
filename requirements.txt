@@ -1,0 +1,8 @@
+pyrogram
+tgcrypto
+aiohttp
+flask
+yt-dlp
+moviepy
+pillow
+requests
