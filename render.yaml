@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: telegram-downloader-bot
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: python3 bot.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
