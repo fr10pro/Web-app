@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: telegram-downloader-bot
+    name: Web-app
     env: python
     plan: free
     buildCommand: ""
