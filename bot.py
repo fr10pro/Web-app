@@ -1047,4 +1047,4 @@ if __name__ == "__main__":
        - For external access, use ngrok or similar tunneling service
     """)
     
-    run_bot_and_flask()
+    run_bot_and_flask(
