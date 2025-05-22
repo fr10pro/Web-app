@@ -1,57 +1,173 @@
-# bot.py
-
-import asyncio
 import os
-import time
-from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from config import API_ID, API_HASH, BOT_TOKEN, ADMINS, DEFAULT_CAPTION, WELCOME_MESSAGE, THUMBNAIL_PATH
-from utils import download_from_url, get_thumbnail, format_bytes
-from database import add_user
+import re
+import asyncio
+import logging
+import requests
+from flask import Flask, request, render_template_string, redirect
+from pyrogram import Client, filters, enums
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
+from yt_dlp import YoutubeDL
+from moviepy.editor import VideoFileClip
 
-app = Client("downloader-bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+API_ID = 28593211  # your api_id
+API_HASH = "27ad7de4fe5cab9f8e310c5cc4b8d43d"
+BOT_TOKEN = "7696316358:AAGZw4OUGAT628QX2DBleIVV2JWQTfiQu88"
+ADMIN_IDS = [5559075560]  # your Telegram user ID(s)
 
-@app.on_message(filters.private & filters.command("start"))
-async def start_handler(client, message: Message):
-    add_user(message.from_user.id)
-    await message.reply_photo(
-        photo=THUMBNAIL_PATH if os.path.exists(THUMBNAIL_PATH) else None,
-        caption=WELCOME_MESSAGE,
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("Source", url="https://github.com")]]
-        )
-    )
+app = Flask(__name__)
+bot = Client("downloader_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-@app.on_message(filters.private & filters.text & ~filters.command("start"))
-async def link_handler(client, message: Message):
-    url = message.text.strip()
-    msg = await message.reply("Processing your link...")
+USERS = set()
+WELCOME_MESSAGE = "Send me a link to download from any social/media/streaming site!"
+THUMBNAIL = "https://telegra.ph/file/f9a07ab1e9e7c2a57e71e.jpg"
+
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
+
+# --- Helper Functions ---
+def format_bytes(size):
+    power = 2**10
+    n = 0
+    Dic_powerN = {0: 'B', 1: 'KB', 2: 'MB', 3: 'GB'}
+    while size > power:
+        size /= power
+        n += 1
+    return f"{size:.2f}{Dic_powerN[n]}"
+
+async def progress_hook(current, total, message: Message):
+    try:
+        await message.edit_text(f"**Progress:** {format_bytes(current)} / {format_bytes(total)}")
+    except Exception:
+        pass
+
+def download_media(url):
+    ydl_opts = {
+        'format': 'bestvideo+bestaudio/best',
+        'outtmpl': f'{DOWNLOAD_FOLDER}/%(title).80s.%(ext)s',
+        'noplaylist': True,
+        'quiet': True,
+    }
+    with YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(url, download=True)
+        return ydl.prepare_filename(result), result.get('thumbnail')
+
+# --- Telegram Bot Handlers ---
+
+@bot.on_message(filters.private & filters.command("start"))
+async def start(_, msg):
+    USERS.add(msg.from_user.id)
+    kb = [[InlineKeyboardButton("Source", url="https://github.com/")]]
+    await msg.reply(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(kb))
+
+@bot.on_message(filters.private & filters.text & ~filters.command(["start"]))
+async def handle_download(_, msg):
+    url = msg.text.strip()
+    user_id = msg.from_user.id
+    if not re.match(r'^https?://', url):
+        await msg.reply("Please send a valid link.")
+        return
+
+    USERS.add(user_id)
+    status = await msg.reply("Downloading...")
 
     try:
-        file_path, file_name, file_size = await download_from_url(url, message)
-        thumb = get_thumbnail(file_path)
-        caption = DEFAULT_CAPTION.format(filename=file_name)
+        filepath, thumb_url = download_media(url)
+        fname = os.path.basename(filepath)
 
-        await msg.edit("Uploading file...")
-        await client.send_document(
-            chat_id=message.chat.id,
-            document=file_path,
-            caption=caption,
-            file_name=file_name,
-            thumb=thumb,
-            progress=progress_bar,
-            progress_args=(msg, time.time(), file_name)
-        )
-        os.remove(file_path)
+        # Rename Option (Skip for now, or use callback buttons)
+        caption = f"{fname}\n\nMade by @fr10pro"
+
+        thumb = None
+        if thumb_url:
+            thumb_data = requests.get(thumb_url).content
+            with open("thumb.jpg", "wb") as f:
+                f.write(thumb_data)
+            thumb = "thumb.jpg"
+
+        await status.edit_text("Uploading...")
+        await msg.reply_document(filepath, caption=caption, thumb=thumb)
+
     except Exception as e:
-        await msg.edit(f"Error: {e}")
+        await status.edit_text(f"Error: {e}")
+    finally:
+        for f in [filepath, "thumb.jpg"]:
+            if os.path.exists(f):
+                os.remove(f)
 
-async def progress_bar(current, total, msg, start, filename):
-    now = time.time()
-    diff = now - start
-    speed = current / diff if diff > 0 else 0
-    percent = current * 100 / total
-    bar = f"[{'█' * int(percent // 10)}{' ' * (10 - int(percent // 10))}]"
-    current_mb = format_bytes(current)
-    total_mb = format_bytes(total)
-    await msg.edit(f"{filename}\n{bar} {percent:.2f}%\n{current_mb} / {total_mb} @ {format_bytes(speed)}/s")
+# --- Flask Web Admin ---
+
+ADMIN_PASS = "admin123"
+
+@app.route("/")
+def home():
+    return redirect("/admin")
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASS:
+            return redirect("/panel")
+        else:
+            return "Wrong password."
+    return '''<form method="post">
+        <input type="password" name="password" placeholder="Admin password"/>
+        <input type="submit"/>
+    </form>'''
+
+@app.route("/panel")
+def admin_panel():
+    return render_template_string("""
+        <h2>Welcome Admin</h2>
+        <ul>
+            <li><a href="/broadcast">Broadcast</a></li>
+            <li><a href="/stats">User Stats</a></li>
+            <li><a href="/update_welcome">Change Welcome Msg</a></li>
+            <li><a href="/update_thumb">Update Thumbnail</a></li>
+        </ul>
+    """)
+
+@app.route("/broadcast", methods=["GET", "POST"])
+def broadcast():
+    if request.method == "POST":
+        msg = request.form.get("message")
+        asyncio.run(send_broadcast(msg))
+        return "Broadcast sent!"
+    return '''<form method="post">
+        <textarea name="message" rows="4" cols="50"></textarea>
+        <input type="submit" value="Send"/>
+    </form>'''
+
+@app.route("/stats")
+def stats():
+    return f"<h3>Total Users: {len(USERS)}</h3>"
+
+@app.route("/update_welcome", methods=["GET", "POST"])
+def update_welcome():
+    global WELCOME_MESSAGE
+    if request.method == "POST":
+        WELCOME_MESSAGE = request.form.get("message")
+        return "Updated!"
+    return f'''<form method="post">
+        <textarea name="message">{WELCOME_MESSAGE}</textarea>
+        <input type="submit" value="Update"/>
+    </form>'''
+
+@app.route("/update_thumb", methods=["GET", "POST"])
+def update_thumb():
+    global THUMBNAIL
+    if request.method == "POST":
+        THUMBNAIL = request.form.get("thumb")
+        return "Thumbnail updated!"
+    return f'''<form method="post">
+        <input type="text" name="thumb" value="{THUMBNAIL}" />
+        <input type="submit" value="Update"/>
+    </form>'''
+
+# --- Run Bot & Panel Together ---
+async def main():
+    await bot.start()
+    print("Bot is running.")
+    app.run(port=8080)
+
+if __name__ == "__main__":
+    asyncio.run(main())
