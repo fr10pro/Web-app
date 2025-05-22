@@ -2,9 +2,10 @@ services:
   - type: web
     name: Web-app
     env: python
+    region: oregon
     plan: free
-    buildCommand: ""
-    startCommand: python3 bot.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python bot.py
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11
+      - key: PORT
+        value: 8080
