@@ -1,6 +1,4 @@
-pyrogram==2.0.106
-tgcrypto
 flask
+pyTelegramBotAPI
+schedule
 requests
-aiohttp
-certifi
